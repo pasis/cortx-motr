@@ -59,6 +59,20 @@ static bool use_mmaped_buffer = true;
 static char trace_file_path[PATH_MAX];
 static size_t trace_buf_size = M0_TRACE_UBUF_SIZE;
 
+static int preallocate(int fd, m0_bcount_t nob)
+{
+#if defined(M0_LINUX)
+	return posix_fallocate(fd, 0, nob);
+#else
+	char ch = 0;
+	for (; nob > 0; --nob) {
+		if (write(fd, &ch, 1) != 1)
+			return errno ?: M0_ERR(-ENOSPC);
+	}
+	return 0;
+#endif
+}
+
 static int logbuf_map()
 {
 	struct m0_trace_area *trace_area;
@@ -94,11 +108,10 @@ static int logbuf_map()
 
 	if ((logfd = open(trace_file_path, O_RDWR|O_CREAT|O_TRUNC|O_CLOEXEC, 0700)) == -1) {
 		warn("open(\"%s\")", trace_file_path);
-	} else if ((errno = posix_fallocate(logfd, 0, trace_area_size)) != 0) {
+	} else if ((errno = preallocate(logfd, trace_area_size)) != 0) {
 		warn("fallocate(\"%s\", %zu)", trace_file_path, trace_area_size);
 	} else if ((trace_area = mmap(NULL, trace_area_size, PROT_WRITE,
-				      MAP_SHARED, logfd, 0)) == MAP_FAILED)
-	{
+				      MAP_SHARED, logfd, 0)) == MAP_FAILED) {
 		warn("mmap(\"%s\")", trace_file_path);
 	} else {
 		m0_logbuf_header = &trace_area->ta_header;
@@ -391,7 +404,8 @@ static void print_trace_buf_header(FILE *ofile,
 	fprintf(ofile, "  header_addr:        %p\n", tbh->tbh_header_addr);
 	fprintf(ofile, "  header_size:        %u\t\t# bytes\n", tbh->tbh_header_size);
 	fprintf(ofile, "  buffer_addr:        %p\n", tbh->tbh_buf_addr);
-	fprintf(ofile, "  buffer_size:        %lu\t\t# bytes\n", tbh->tbh_buf_size);
+	fprintf(ofile, "  buffer_size:        %"PRId64"\t\t# bytes\n",
+		tbh->tbh_buf_size);
 
 	if (tbh->tbh_buf_type == M0_TRACE_BUF_KERNEL) {
 		fprintf(ofile, "  mod_struct_addr:    %p\n",
@@ -457,7 +471,8 @@ static int calc_trace_descr_offset(const struct m0_trace_buf_header *tbh,
 		msym = (uint64_t*)((char*)ko_addr + msym_file_offset);
 		if (*msym != M0_TRACE_MAGIC) {
 			warnx("invalid trace magic symbol value in '%s' file at"
-			      " offset 0x%lx: 0x%lx (expected 0x%lx)",
+			      " offset 0x%"PRId64": 0x%"PRId64
+			      " (expected 0x%lx)",
 			      m0tr_ko_path, msym_file_offset, *msym,
 			      M0_TRACE_MAGIC);
 			return EX_DATAERR;

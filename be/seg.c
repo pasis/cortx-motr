@@ -41,6 +41,13 @@
 #include <sys/mman.h>         /* mmap */
 #include <search.h>           /* twalk */
 
+#if defined(M0_DARWIN)
+enum unused {
+	MADV_DONTDUMP,
+	MADV_DONTFORK
+};
+#endif
+
 /**
  * @addtogroup be
  *
@@ -93,7 +100,8 @@ static int be_seg_hdr_create(struct m0_stob *stob, struct m0_be_seg_hdr *hdr)
 
 	for (i = 0; i < len; ++i) {
 		const struct m0_be_seg_geom *g = &geom[i];
-		M0_LOG(M0_DEBUG, "stob=%p size=%lu addr=%p offset=%lu id=%lu",
+		M0_LOG(M0_DEBUG, "stob=%p size=%"PRId64" addr=%p "
+		       "offset=%"PRId64" id=%"PRId64,
 		       stob, g->sg_size, g->sg_addr, g->sg_offset, g->sg_id);
 
 		M0_PRE(g->sg_addr != NULL);
@@ -298,6 +306,7 @@ bool m0_be_reg__invariant(const struct m0_be_reg *reg)
 static void be_seg_madvise(struct m0_be_seg *seg, m0_bcount_t dump_limit,
 			   int flag)
 {
+#if defined(M0_LINUX)
 	int rc;
 
 	if (dump_limit >= seg->bs_size)
@@ -317,7 +326,7 @@ static void be_seg_madvise(struct m0_be_seg *seg, m0_bcount_t dump_limit,
 	else
 		M0_LOG(M0_ERROR, "madvise(%p, %"PRIu64", %d) = %d",
 		       seg->bs_addr, seg->bs_size, flag, rc);
-
+#endif /* M0_LINUX */
 }
 
 M0_INTERNAL int m0_be_seg_open(struct m0_be_seg *seg)
