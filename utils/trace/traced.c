@@ -33,8 +33,12 @@
 #include <unistd.h>     /* close, daemon, STDOUT_FILENO */
 #include <syslog.h>     /* openlog, vsyslog */
 #include <stdarg.h>     /* va_arg */
+#if defined(M0_LINUX)
 #include <linux/limits.h> /* PATH_MAX */
-#include <sys/sendfile.h> /* sendfile */
+#elif defined(M0_DARWIN)
+#include <limits.h>       /* PATH_MAX */
+#include <libgen.h>       /* basename */
+#endif
 #include <sys/utsname.h>  /* uname */
 
 #include "motr/init.h"             /* m0_init */
@@ -162,7 +166,7 @@ static const struct m0_trace_buf_header *read_trace_buf_header(int ifd)
 
 	log_info("Trace buffer header:  [%s]\n", input_file_name);
 	log_info("  header size: %u\n", tb_header->tbh_header_size);
-	log_info("  buffer size: %lu\n", tb_header->tbh_buf_size);
+	log_info("  buffer size: %"PRIu64"\n", tb_header->tbh_buf_size);
 	log_info("  buffer type: %s\n",
 		tb_header->tbh_buf_type == M0_TRACE_BUF_KERNEL ? "kernel" :
 		tb_header->tbh_buf_type == M0_TRACE_BUF_USER   ? "user"   :
@@ -545,7 +549,7 @@ int main(int argc, char *argv[])
 	void                             *logbuf;
 	struct m0_thread                  rotator_tid = { 0 };
 	struct rotator_ctx                rotator_data = { 0 };
-	int32_t                           monitor_cycles = 0;
+	CAPTURED int32_t                  monitor_cycles = 0;
 
 	struct sigaction old_sa;
 	struct sigaction sa = {
@@ -671,9 +675,11 @@ int main(int argc, char *argv[])
 		 * become a daemon (fork background process,
 		 * close STD{IN,OUT}, etc.)
 		 */
+#if defined(M0_LINUX)
 		rc = daemon(0, 0);
 		if (rc != 0)
 			err(EX_OSERR, "failed to switch to daemon mode");
+#endif
 	}
 
 	rc  = sigaction(SIGTERM, &sa, &old_sa);

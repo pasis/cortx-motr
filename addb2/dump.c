@@ -34,9 +34,12 @@
 #include <sysexits.h>
 #include <execinfo.h>
 #include <signal.h>
-#include <bfd.h>
 #include <stdlib.h>                    /* qsort */
 #include <unistd.h>                    /* sleep */
+
+#if defined(M0_LINUX)
+#include <bfd.h>
+#endif
 
 #include "lib/memory.h"
 #include "lib/assert.h"
@@ -192,7 +195,7 @@ int main(int argc, char **argv)
 	struct m0               instance = {0};
 	int                     result;
 	int                     i;
-	int                     rc;
+	CAPTURED int            rc;
 
 	m0_node_uuid_string_set(NULL);
 	result = m0_init(&instance);
@@ -273,67 +276,61 @@ int main(int argc, char **argv)
 
 static int plugin_load(struct plugin *plugin)
 {
-    M0_ENTRY();
-    M0_PRE(plugin != NULL);
-    M0_PRE(plugin->p_path != NULL);
+	M0_ENTRY();
+	M0_PRE(plugin != NULL);
+	M0_PRE(plugin->p_path != NULL);
 
-    plugin->p_handle = dlopen(plugin->p_path, RTLD_LAZY);
-
-    if (plugin->p_handle == NULL)
-        return M0_ERR_INFO(-ELIBACC, "%s", dlerror());
-
-    plugin->p_intrp_load = dlsym(plugin->p_handle, M0_ADDB2__PLUGIN_FUNC_NAME);
-
-    if (plugin->p_intrp_load == NULL) {
-        dlclose(plugin->p_handle);
-        plugin->p_handle = NULL;
-        return M0_ERR_INFO(-ELIBBAD, "%s", dlerror());
-    }
-
-    return M0_RC(0);
+	plugin->p_handle = dlopen(plugin->p_path, RTLD_LAZY);
+	if (plugin->p_handle == NULL)
+		return M0_ERR_INFO(-ENOENT, "%s", dlerror());
+	plugin->p_intrp_load = dlsym(plugin->p_handle,
+				     M0_ADDB2__PLUGIN_FUNC_NAME);
+	if (plugin->p_intrp_load == NULL) {
+		dlclose(plugin->p_handle);
+		plugin->p_handle = NULL;
+		return M0_ERR_INFO(-ENOENT, "%s", dlerror());
+	}
+	return M0_RC(0);
 }
 
 static void plugin_unload(struct plugin *plugin)
 {
-    M0_ENTRY();
-    M0_PRE(plugin != NULL);
-    M0_PRE(plugin->p_handle != NULL);
+	M0_ENTRY();
+	M0_PRE(plugin != NULL);
+	M0_PRE(plugin->p_handle != NULL);
 
-    dlclose(plugin->p_handle);
+	dlclose(plugin->p_handle);
 }
 
 static int plugins_load(void)
 {
-    struct plugin *p;
-    int            i;
-    int            rc;
+	struct plugin *p;
+	int            i;
+	int            rc;
 
-    for (i = 0; i < plugins_nr; ++i) {
-        p = &plugins[i];
-        rc = plugin_load(p) ?: p->p_intrp_load(p->p_flag, &p->p_intrp);
-
-        if (rc != 0)
-            return M0_ERR(rc);
-    }
-
-    return M0_RC(0);
+	for (i = 0; i < plugins_nr; ++i) {
+		p = &plugins[i];
+		rc = plugin_load(p) ?: p->p_intrp_load(p->p_flag, &p->p_intrp);
+		if (rc != 0)
+			return M0_ERR(rc);
+	}
+	return M0_RC(0);
 }
 
 static void plugins_unload(void)
 {
-    struct plugin *plugin;
-    int            i;
+	struct plugin *plugin;
+	int            i;
 
-    for (i = 0; i < plugins_nr; ++i) {
-        plugin = &plugins[i];
-        plugin_unload(plugin);
-    }
-
-    plugins_nr = 0;
+	for (i = 0; i < plugins_nr; ++i) {
+		plugin = &plugins[i];
+		plugin_unload(plugin);
+	}
+	plugins_nr = 0;
 }
 
 static bool intrps_equal(const struct m0_addb2__id_intrp *intrp0,
-                         const struct m0_addb2__id_intrp *intrp1)
+			 const struct m0_addb2__id_intrp *intrp1)
 {
     return memcmp(intrp0, intrp1, sizeof(struct m0_addb2__id_intrp)) == 0;
 }
@@ -366,7 +363,7 @@ static void file_dump(struct m0_stob_domain *dom, const char *fname)
 	do {
 		result = m0_addb2_sit_init(&sit, stob, offset);
 		if (delay > 0 && result == -EPROTO) {
-			printf("Sleeping for %i seconds (%lx).\n",
+			printf("Sleeping for %i seconds (%"PRIx64").\n",
 			       delay, offset);
 			sleep(delay);
 			continue;
@@ -422,7 +419,7 @@ static void ptr(struct m0_addb2__context *ctx, const uint64_t *v, char *buf)
 {
 	if (json_output)
 		/* JSON spec supports only decimal format (int and float) */
-		sprintf(buf, "{\"ptr\":%"PRId64"}", (long)*(void **)v);
+		sprintf(buf, "{\"ptr\":%"PRId64"}", (uint64_t)*(void **)v);
 	else
 		sprintf(buf, "@%p", *(void **)v);
 }
@@ -468,13 +465,13 @@ static void _clock(struct m0_addb2__context *ctx, const uint64_t *v, char *buf)
 	if (json_output) {
 		gmtime_r(&ts, &tm);
 		/* ISO8601 formating */
-		sprintf(buf, "\"%04d-%02d-%02dT%02d:%02d:%02d.%09luZ\"",
+		sprintf(buf, "\"%04d-%02d-%02dT%02d:%02d:%02d.%09"PRIu64"Z\"",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec,
 			m0_time_nanoseconds(stamp));
 	}else {
 		localtime_r(&ts, &tm);
-		sprintf(buf, "%04d-%02d-%02d-%02d:%02d:%02d.%09lu",
+		sprintf(buf, "%04d-%02d-%02d-%02d:%02d:%02d.%09"PRIu64,
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec,
 			m0_time_nanoseconds(stamp));
@@ -655,7 +652,7 @@ static void sym(struct m0_addb2__context *ctx, const uint64_t *v, char *buf)
 		if (json_output)
 			sprintf(buf, "\"symbol\":{\"addr\":%"PRId64","
 				     "\"addr_ptr_wrap\":%"PRId64"}",
-				     (long)addr, v[0]);
+				(uint64_t)addr, v[0]);
 		else
 			sprintf(buf, " @%p/%"PRIx64, addr, v[0]);
 	}
@@ -1346,8 +1343,7 @@ static void val_dump_json(struct m0_addb2__context *ctx,
 		 /* boolean attributes (flags) */
 		if (val->va_nr == 0)
 			printf("true");
-		else if (intrp->ii_print != NULL &&
-			 intrp->ii_print[0] == &hist)
+		else if (intrp->ii_print[0] == &hist)
 			printf("true,");
 	}
 	else {
@@ -1461,6 +1457,7 @@ static void context_fill(struct m0_addb2__context *ctx,
 	}
 }
 
+#if defined(M0_LINUX)
 static bfd      *abfd;
 static asymbol **syms;
 static uint64_t  base;
@@ -1543,6 +1540,23 @@ static void libbfd_resolve(uint64_t delta, char *buf)
 		sprintf(buf, " %s", name);
 	}
 }
+
+/* M0_LINUX */
+#else
+
+static void libbfd_init(const char *libpath)
+{}
+
+static void libbfd_fini(void)
+{}
+
+static void libbfd_resolve(uint64_t delta, char *buf)
+{
+	buf[0] = 0;
+}
+
+/* !M0_LINUX */
+#endif
 
 static void deflate(void)
 {

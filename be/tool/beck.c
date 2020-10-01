@@ -380,11 +380,6 @@ M0_BASSERT(ARRAY_SIZE(rt) == M0_FORMAT_TYPE_NR + 1);
 static struct btype bt[] = {
 	_B(M0_BBT_BALLOC_GROUP_EXTENTS, NULL),
 	_B(M0_BBT_BALLOC_GROUP_DESC,    NULL),
-	_B(M0_BBT_EMAP_EM_MAPPING,      NULL),
-	_B(M0_BBT_COB_NAMESPACE,        NULL),
-	_B(M0_BBT_EMAP_EM_MAPPING,      NULL),
-	_B(M0_BBT_CAS_CTG,              NULL),
-	_B(M0_BBT_COB_NAMESPACE,        NULL),
 	_B(M0_BBT_EMAP_EM_MAPPING,      &emap_proc),
 	_B(M0_BBT_CAS_CTG,              &ctg_proc),
 	_B(M0_BBT_COB_NAMESPACE,        &cob_proc),
@@ -441,7 +436,7 @@ static bool  signaled = false;
 	       (rc), ftell(s->s_file), strerror(errno), errno, feof(s->s_file))
 
 #define RLOG(level, prefix, s, r, tag)					\
-	M0_LOG(level, prefix " %li %s %hu:%hu:%u", s->s_off, recname(r), \
+	M0_LOG(level, prefix " %"PRIu64" %s %hu:%hu:%u", s->s_off, recname(r), \
 	       (tag)->ot_version, (tag)->ot_type, (tag)->ot_size)
 
 static void sig_handler(int num)
@@ -1364,14 +1359,13 @@ static void builder_thread(struct builder *b)
 	} while (act->a_opc != AO_DONE);
 	M0_ASSERT(b->b_qq.q_nr == 0);
 
-	/* Below clean up used as m0_be_ut_backend_fini()  fails because of
-	* unlocked thread's sm group. Simplify this task and call the exit
-	* function for builder thread.
-	*/
-	if (&b->b_backend != NULL) {
-		(void)m0_be_ut_backend_sm_group_lookup(&b->b_backend);
-		m0_be_ut_backend_thread_exit(&b->b_backend);
-	}
+	/*
+	 * Below clean up used as m0_be_ut_backend_fini() fails because of
+	 * unlocked thread's sm group. Simplify this task and call the exit
+	 * function for builder thread.
+	 */
+	(void)m0_be_ut_backend_sm_group_lookup(&b->b_backend);
+	m0_be_ut_backend_thread_exit(&b->b_backend);
 }
 
 static int ad_dom_init(struct builder *b)
@@ -1637,7 +1631,7 @@ static bool btree_kv_post_is_valid(struct scanner *s,
 
 static void btree_bad_kv_count_update(uint64_t type, int count)
 {
-	M0_LOG(M0_DEBUG, "Discarded kv = %d from btree = %lu", count, type);
+	M0_LOG(M0_DEBUG, "Discarded kv = %d from btree = %"PRIu64, count, type);
 	bt[type].b_stats.c_kv_bad += count;
 }
 
@@ -2268,9 +2262,52 @@ static const struct action_ops done_ops = {
 	.o_fini = &noop_fini
 };
 
+enum { NR = 10000, THREADS = 51, MAX = 40 };
+
+static void test_put(struct queue *q)
+{
+	int n;
+	struct action *act;
+
+	for (n = 0; n < 2 * NR; ++n) { /* Twice. */
+		M0_ALLOC_PTR(act);
+		M0_ASSERT(act != NULL);
+		qput(q, act);
+	}
+	printf(" +%"PRIi64, q->q_nr);
+}
+
+static void test_get(struct queue *q)
+{
+	int n = NR;
+	struct action *act;
+
+	while (n > 0) {
+		act = qget(q);
+		M0_ASSERT(act != NULL);
+		n--;
+		m0_free(act);
+	}
+	printf(" -%"PRIi64, q->q_nr);
+}
+
+static void test_try(struct queue *q)
+{
+	int n = NR;
+	struct action *act;
+
+	while (n > 0) {
+		act = qtry(q);
+		if (act != NULL) {
+			n--;
+			m0_free(act);
+		}
+	}
+	printf(" ?%"PRIi64, q->q_nr);
+}
+
 static void test_queue(void)
 {
-	enum { NR = 10000, THREADS = 51, MAX = 40 };
 	struct m0_thread tp[THREADS] = {};
 	struct m0_thread tg[THREADS] = {};
 	struct m0_thread tt[THREADS] = {};
@@ -2281,45 +2318,12 @@ static void test_queue(void)
 	printf("\tQueue...");
 	qinit(&q, MAX);
 	for (i = 0; i < THREADS; ++i) {
-		M0_THREAD_INIT(&tp[i], void *, NULL,
-			LAMBDA(void, (void *nonce) {
-				int n;
-				struct action *act;
-
-				for (n = 0; n < 2 * NR; ++n) { /* Twice. */
-					M0_ALLOC_PTR(act);
-					M0_ASSERT(act != NULL);
-					qput(&q, act);
-				}
-				printf(" +%"PRIi64, q.q_nr);
-			}), NULL, "qp-%d", i);
-		M0_THREAD_INIT(&tg[i], void *, NULL,
-			LAMBDA(void, (void *nonce) {
-				int n = NR;
-				struct action *act;
-
-				while (n > 0) {
-					act = qget(&q);
-					M0_ASSERT(act != NULL);
-					n--;
-					m0_free(act);
-				}
-				printf(" -%"PRIi64, q.q_nr);
-			}), NULL, "qg-%d", i);
-		M0_THREAD_INIT(&tt[i], void *, NULL,
-			LAMBDA(void, (void *nonce) {
-				int n = NR;
-				struct action *act;
-
-				while (n > 0) {
-					act = qtry(&q);
-					if (act != NULL) {
-						n--;
-						m0_free(act);
-					}
-				}
-				printf(" ?%"PRIi64, q.q_nr);
-			}), NULL, "qt-%d", i);
+		M0_THREAD_INIT(&tp[i], struct queue *, NULL,
+			       &test_put, &q, "qp-%d", i);
+		M0_THREAD_INIT(&tg[i], struct queue *, NULL,
+			       &test_get, &q, "qg-%d", i);
+		M0_THREAD_INIT(&tt[i], struct queue *, NULL,
+			       &test_try, &q, "qt-%d", i);
 	}
 	for (i = 0; i < THREADS; ++i) {
 		m0_thread_join(&tp[i]);
