@@ -727,6 +727,8 @@ M0_INTERNAL int m0_be_allocator_init(struct m0_be_allocator *a,
 
 	M0_PRE(m0_be_seg__invariant(seg));
 
+	/* See comment in m0_be_btree_init(). */
+	M0_SET0(&a->ba_lock);
 	m0_mutex_init(&a->ba_lock);
 
 	a->ba_seg = seg;
