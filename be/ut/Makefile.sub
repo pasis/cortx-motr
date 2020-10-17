@@ -22,6 +22,7 @@ ut_libmotr_ut_la_SOURCES += be/ut/alloc.c           \
                             be/ut/seg.c             \
                             be/ut/seg0.c            \
                             be/ut/seg_dict.c        \
+                            be/ut/tbq.c             \
                             be/ut/tx.c              \
                             be/ut/tx_bulk.c         \
                             be/ut/tx_group_format.c \

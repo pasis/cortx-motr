@@ -28,6 +28,7 @@ nobase_motr_include_HEADERS += \
                                be/seg0.h            \
                                be/seg_dict.h        \
                                be/seg_internal.h    \
+                               be/tbq.h             \
                                be/tx.h              \
                                be/tx_bulk.h         \
                                be/tx_credit.h       \
@@ -64,6 +65,7 @@ motr_libmotr_la_SOURCES += be/alloc.c           \
 			   be/seg.c             \
 			   be/seg0.c            \
 			   be/seg_dict.c        \
+			   be/tbq.c             \
 			   be/tx.c              \
 			   be/tx_bulk.c         \
 			   be/tx_credit.c       \

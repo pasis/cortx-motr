@@ -56,18 +56,20 @@ struct be_tx_bulk_worker;
 /**
  * User configuration with user-supplied callbacks for m0_be_tx_bulk.
  *
- * tbc_next(), tbc_credit() and tbc_do() should be thread-safe because they can
- * be called from any locality.
+ * - tbc_next(), tbc_credit() and tbc_do() should be thread-safe because they
+ *   can be called from any locality. They could also be called from different
+ *   localities;
+ * - it's possible to have more than one tbc_do() call in a single transaction.
  */
 struct m0_be_tx_bulk_cfg {
 	/** BE domain for transactions */
 	struct m0_be_domain  *tbc_dom;
-	/** It is passed as parameter to tbc_next, tbc_credit and tbc_do */
+	/** It's passed as a parameter to tbc_next, tbc_credit and tbc_do */
 	void                 *tbc_datum;
 	/**
 	 * Is there any remaining work to do?
 	 * If there is, then set *user to the some pointer and set op rc to 0.
-	 * It will be passed to tbc_credit() and tbc_do().
+	 * *user will be passed to tbc_credit() and tbc_do().
 	 * If there is no work left, set op rc to -ENOENT.
 	 *
 	 * @see m0_be_op_rc_set()
@@ -82,12 +84,14 @@ struct m0_be_tx_bulk_cfg {
 	                                  m0_bcount_t            *accum_payload,
 	                                  void                   *datum,
 	                                  void                   *user);
-	/** Do some work in context of BE transaction */
+	/** Do some work in the context of a BE transaction */
 	void                (*tbc_do)(struct m0_be_tx_bulk   *tb,
 	                              struct m0_be_tx        *tx,
 	                              struct m0_be_op        *op,
 	                              void                   *datum,
 	                              void                   *user);
+	/** Maximum allowed number of tbc_do() calls in a single transaction. */
+	uint32_t              tbc_max_work_per_tx;
 };
 
 struct m0_be_tx_bulk {
