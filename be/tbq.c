@@ -38,12 +38,6 @@
 #include "be/op.h"              /* m0_be_op_active */
 
 
-struct be_tbq_data_return {             /* XXX remove it */
-	void                   **bbdr_user;
-	struct m0_be_tx_credit  *bbdr_credit;
-	m0_bcount_t             *bbdr_payload_size;
-};
-
 struct be_tbq_item {
 	struct m0_be_tbq_data bbi_data;
 	uint64_t              bbi_magic;
