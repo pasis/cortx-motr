@@ -42,7 +42,8 @@
 
 
 struct m0_be_op;
-struct be_tx_bulk_wait_op;
+struct be_tbq_wait_op;
+struct be_tbq_item;
 
 struct m0_be_tbq_data {
 	void                   *bbd_user;
@@ -56,13 +57,6 @@ struct m0_be_tbq_data {
 #define BETBQD_P(bqd) (bqd), (bqd)->bbd_user, BETXCR_P(&(bqd)->bbd_credit), \
 	(bqd)->bbd_payload_size
 
-struct m0_be_tbq_item {
-	struct m0_be_tbq_data bbi_data;
-	uint64_t                   bbi_magic;
-	/** tbq_tl, m0_be_tbq::bbq_q */
-	struct m0_tlink            bbi_link;
-};
-
 struct m0_be_tbq_cfg {
 	uint32_t bqc_q_size_max;
 	uint32_t bqc_producers_nr_max;
@@ -72,57 +66,48 @@ struct m0_be_tbq_cfg {
 /**
  */
 struct m0_be_tbq {
-	struct m0_be_tbq_cfg  bbq_cfg;
-	struct m0_mutex                 bbq_lock;
+	struct m0_be_tbq_cfg   bbq_cfg;
+	struct m0_mutex        bbq_lock;
 
-	/** tbq_tl, m0_be_tbq_item::bbi_link */
-	struct m0_tl                    bbq_q;
-	struct m0_tl                    bbq_q_unused;
+	/** tbq_tl, be_tbq_item::bbi_link */
+	struct m0_tl           bbq_q;
+	struct m0_tl           bbq_q_unused;
 
-	/** tbqop_tl, m0_be_tbq_item::bbi_link */
-	struct m0_tl                    bbq_op_put;
-	struct m0_tl                    bbq_op_put_unused;
-	struct m0_tl                    bbq_op_get;
-	struct m0_tl                    bbq_op_get_unused;
+	/** tbqop_tl, be_tbq_item::bbi_link */
+	struct m0_tl           bbq_op_put;
+	struct m0_tl           bbq_op_put_unused;
+	struct m0_tl           bbq_op_get;
+	struct m0_tl           bbq_op_get_unused;
 
 	/** Pre-allocated array of qitems */
-	struct m0_be_tbq_item     *bbq_qitems;
+	struct be_tbq_item    *bbq_qitems;
 	/** Is used to wait in m0_be_tbq_get() */
-	struct be_tx_bulk_wait_op      *bbq_ops_get;
+	struct be_tbq_wait_op *bbq_ops_get;
 	/** Is used to wait in m0_be_tbq_put() */
-	struct be_tx_bulk_wait_op      *bbq_ops_put;
+	struct be_tbq_wait_op *bbq_ops_put;
 
-	uint32_t                        bbq_enqueued;
-	uint32_t                        bbq_dequeued;
+	uint32_t               bbq_enqueued;
+	uint32_t               bbq_dequeued;
 };
 
 #define BETBQ_F "(queue=%p bbq_enqueued=%"PRIu32" bbq_dequeued=%"PRIu32")"
 #define BETBQ_P(bbq) (bbq), (bbq)->bbq_enqueued, (bbq)->bbq_dequeued
 
 M0_INTERNAL int m0_be_tbq_init(struct m0_be_tbq     *bbq,
-                                         struct m0_be_tbq_cfg *cfg);
+                               struct m0_be_tbq_cfg *cfg);
 M0_INTERNAL void m0_be_tbq_fini(struct m0_be_tbq *bbq);
 
 M0_INTERNAL void m0_be_tbq_lock(struct m0_be_tbq *bbq);
 M0_INTERNAL void m0_be_tbq_unlock(struct m0_be_tbq *bbq);
 
-M0_INTERNAL void
-m0_be_tbq_put(struct m0_be_tbq   *bbq,
-                        struct m0_be_op              *op,
-                        void                         *user,
-                        const struct m0_be_tx_credit *credit,
-                        m0_bcount_t                   payload_size);
-M0_INTERNAL void
-m0_be_tbq_get(struct m0_be_tbq  *bbq,
-                        struct m0_be_op             *op,
-                        void                       **user,
-                        struct m0_be_tx_credit      *credit,
-                        m0_bcount_t                 *payload_size);
-M0_INTERNAL bool
-m0_be_tbq_peek(struct m0_be_tbq  *bbq,
-                        void                        **user,
-                        struct m0_be_tx_credit       *credit,
-                        m0_bcount_t                  *payload_size);
+M0_INTERNAL void m0_be_tbq_put(struct m0_be_tbq      *bbq,
+                               struct m0_be_op       *op,
+                               struct m0_be_tbq_data *bqd);
+M0_INTERNAL void m0_be_tbq_get(struct m0_be_tbq      *bbq,
+                               struct m0_be_op       *op,
+                               struct m0_be_tbq_data *bqd);
+M0_INTERNAL bool m0_be_tbq_peek(struct m0_be_tbq      *bbq,
+                                struct m0_be_tbq_data *bqd);
 
 /** @} end of be group */
 #endif /* __MOTR_BE_TX_BULK_QUEUE_H__ */
