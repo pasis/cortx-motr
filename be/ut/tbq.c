@@ -48,6 +48,7 @@
 
 enum be_ut_tbq_test {
 	BE_UT_TBQ_1_1_1,
+	BE_UT_TBQ_2_1_1,
 	BE_UT_TBQ_100_1_1,
 	BE_UT_TBQ_100_1_10,
 	BE_UT_TBQ_100_10_1,
@@ -65,6 +66,7 @@ struct be_ut_tbq_cfg {
 	uint32_t butc_producers;
 	uint32_t butc_consumers;
 	uint64_t butc_items_nr;
+	uint64_t butc_seed;
 };
 
 struct be_ut_tbq_result {
@@ -115,16 +117,17 @@ struct be_ut_tbq_thread_param {
 }
 
 static struct be_ut_tbq_cfg be_ut_tbq_tests_cfg[BE_UT_TBQ_NR] = {
-	[BE_UT_TBQ_1_1_1]      = BE_UT_TBQ_TEST(  1,   1,   1,  100),
-	[BE_UT_TBQ_100_1_1]    = BE_UT_TBQ_TEST(100,   1,   1, 1000),
-	[BE_UT_TBQ_100_1_10]   = BE_UT_TBQ_TEST(100,   1,  10, 1000),
-	[BE_UT_TBQ_100_10_1]   = BE_UT_TBQ_TEST(100,  10,   1, 1000),
-	[BE_UT_TBQ_100_10_10]  = BE_UT_TBQ_TEST(100,  10,  10, 1000),
-	[BE_UT_TBQ_10_100_1]   = BE_UT_TBQ_TEST( 10, 100,   1, 1000),
-	[BE_UT_TBQ_10_100_5]   = BE_UT_TBQ_TEST( 10, 100,   5, 1000),
-	[BE_UT_TBQ_10_1_100]   = BE_UT_TBQ_TEST( 10,   1, 100, 1000),
-	[BE_UT_TBQ_10_5_100]   = BE_UT_TBQ_TEST( 10,   5, 100, 1000),
-	[BE_UT_TBQ_10_100_100] = BE_UT_TBQ_TEST( 10, 100, 100, 1000),
+	[BE_UT_TBQ_1_1_1]      = BE_UT_TBQ_TEST(  1,   1,   1,     1),
+	[BE_UT_TBQ_2_1_1]      = BE_UT_TBQ_TEST(  2,   1,   1, 10000),
+	[BE_UT_TBQ_100_1_1]    = BE_UT_TBQ_TEST(100,   1,   1, 10000),
+	[BE_UT_TBQ_100_1_10]   = BE_UT_TBQ_TEST(100,   1,  10, 10000),
+	[BE_UT_TBQ_100_10_1]   = BE_UT_TBQ_TEST(100,  10,   1, 10000),
+	[BE_UT_TBQ_100_10_10]  = BE_UT_TBQ_TEST(100,  10,  10, 10000),
+	[BE_UT_TBQ_10_100_1]   = BE_UT_TBQ_TEST( 10, 100,   1, 10000),
+	[BE_UT_TBQ_10_100_5]   = BE_UT_TBQ_TEST( 10, 100,   5, 10000),
+	[BE_UT_TBQ_10_1_100]   = BE_UT_TBQ_TEST( 10,   1, 100, 10000),
+	[BE_UT_TBQ_10_5_100]   = BE_UT_TBQ_TEST( 10,   5, 100, 10000),
+	[BE_UT_TBQ_10_100_100] = BE_UT_TBQ_TEST( 10, 100, 100, 10000),
 };
 
 #undef BE_UT_TBQ_TEST
@@ -199,11 +202,10 @@ static void be_ut_tbq_thread(void *_param)
 	m0_free(op);
 }
 
-static void be_ut_tbq(enum be_ut_tbq_test test)
+static void be_ut_tbq_with_cfg(struct be_ut_tbq_cfg *test_cfg)
 {
 	struct m0_ut_threads_descr    *td;
 	struct be_ut_tbq_thread_param *params;
-	struct be_ut_tbq_cfg          *test_cfg = &be_ut_tbq_tests_cfg[test];
 	struct m0_be_tbq_cfg           bbq_cfg = {
 		.bqc_q_size_max       = test_cfg->butc_q_size_max,
 		.bqc_producers_nr_max = test_cfg->butc_producers,
@@ -214,7 +216,7 @@ static void be_ut_tbq(enum be_ut_tbq_test test)
 	uint32_t                       threads_nr;
 	uint32_t                       items_nr = test_cfg->butc_items_nr;
 	uint64_t                       i;
-	uint64_t                       seed = test;
+	uint64_t                       seed = test_cfg->butc_seed;
 	uint32_t                       divisor;
 	uint32_t                       remainder;
 	int                            rc;
@@ -259,7 +261,7 @@ static void be_ut_tbq(enum be_ut_tbq_test test)
 		remainder = items_nr % divisor;
 		params[i].butqp_items_nr = items_nr / divisor +
 			(remainder == 0 ?
-			 0 : remainder < params[i].butqp_index);
+			 0 : params[i].butqp_index < remainder);
 	}
 	M0_UT_ASSERT(m0_reduce(j, test_cfg->butc_producers,
 			       0, + params[j].butqp_items_nr) == items_nr);
@@ -279,6 +281,11 @@ static void be_ut_tbq(enum be_ut_tbq_test test)
 
 	for (i = 0; i < threads_nr; ++i)
 		m0_semaphore_fini(&params[i].butqp_sem_start);
+
+	M0_UT_ASSERT(m0_exists(j,
+			       test_cfg->butc_producers +
+			       test_cfg->butc_consumers,
+			       params[j].butqp_peeks_unsuccessful > 0));
 	m0_free(params);
 	m0_free(ctx->butx_result);
 	m0_free(ctx->butx_data);
@@ -288,7 +295,14 @@ static void be_ut_tbq(enum be_ut_tbq_test test)
 	m0_free(bbq);
 }
 
+static void be_ut_tbq(enum be_ut_tbq_test test)
+{
+	be_ut_tbq_tests_cfg[test].butc_seed = test;
+	be_ut_tbq_with_cfg(&be_ut_tbq_tests_cfg[test]);
+}
+
 void m0_be_ut_tbq_1_1_1(void)      { be_ut_tbq(BE_UT_TBQ_1_1_1);      }
+void m0_be_ut_tbq_2_1_1(void)      { be_ut_tbq(BE_UT_TBQ_2_1_1);      }
 void m0_be_ut_tbq_100_1_1(void)    { be_ut_tbq(BE_UT_TBQ_100_1_1);    }
 void m0_be_ut_tbq_100_1_10(void)   { be_ut_tbq(BE_UT_TBQ_100_1_10);   }
 void m0_be_ut_tbq_100_10_1(void)   { be_ut_tbq(BE_UT_TBQ_100_10_1);   }
@@ -298,6 +312,30 @@ void m0_be_ut_tbq_10_100_5(void)   { be_ut_tbq(BE_UT_TBQ_10_100_5);   }
 void m0_be_ut_tbq_10_1_100(void)   { be_ut_tbq(BE_UT_TBQ_10_1_100);   }
 void m0_be_ut_tbq_10_5_100(void)   { be_ut_tbq(BE_UT_TBQ_10_5_100);   }
 void m0_be_ut_tbq_10_100_100(void) { be_ut_tbq(BE_UT_TBQ_10_100_100); }
+
+void m0_be_ut_tbq_from_1_to_10(void)
+{
+	const int             MAX = 10;
+	struct be_ut_tbq_cfg *test_cfg;
+	int                   i;
+	int                   j;
+	int                   k;
+
+	M0_ALLOC_PTR(test_cfg);
+	for (i = 1; i <= MAX; ++i)
+		for (j = 1; j <= MAX; ++j)
+			for (k = 1; k <= MAX; ++k) {
+				*test_cfg = (struct be_ut_tbq_cfg){
+					.butc_q_size_max = i,
+					.butc_producers  = j,
+					.butc_consumers  = k,
+					.butc_items_nr   = 100,
+					.butc_seed       = i * 100 + j * 10 + k,
+				};
+				be_ut_tbq_with_cfg(test_cfg);
+			}
+	m0_free(test_cfg);
+}
 
 
 #undef M0_TRACE_SUBSYSTEM

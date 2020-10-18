@@ -37,6 +37,7 @@ extern void m0_be_ut_op_set_usecase(void);
 extern void m0_be_ut_op_set_tree(void);
 
 extern void m0_be_ut_tbq_1_1_1(void);
+extern void m0_be_ut_tbq_2_1_1(void);
 extern void m0_be_ut_tbq_100_1_1(void);
 extern void m0_be_ut_tbq_100_1_10(void);
 extern void m0_be_ut_tbq_100_10_1(void);
@@ -46,6 +47,7 @@ extern void m0_be_ut_tbq_10_100_5(void);
 extern void m0_be_ut_tbq_10_1_100(void);
 extern void m0_be_ut_tbq_10_5_100(void);
 extern void m0_be_ut_tbq_10_100_100(void);
+extern void m0_be_ut_tbq_from_1_to_10(void);
 
 extern void m0_be_ut_pool_usecase(void);
 
@@ -169,6 +171,7 @@ struct m0_ut_suite be_ut = {
 		{ "op_set-usecase",          m0_be_ut_op_set_usecase          },
 		{ "op_set-tree",             m0_be_ut_op_set_tree             },
 		{ "tbq-1_1_1",               m0_be_ut_tbq_1_1_1               },
+		{ "tbq-2_1_1",               m0_be_ut_tbq_2_1_1               },
 		{ "tbq-100_1_1",             m0_be_ut_tbq_100_1_1             },
 		{ "tbq-100_1_10",            m0_be_ut_tbq_100_1_10            },
 		{ "tbq-100_10_1",            m0_be_ut_tbq_100_10_1            },
@@ -178,6 +181,7 @@ struct m0_ut_suite be_ut = {
 		{ "tbq-10_1_100",            m0_be_ut_tbq_10_1_100            },
 		{ "tbq-10_5_100",            m0_be_ut_tbq_10_5_100            },
 		{ "tbq-10_100_100",          m0_be_ut_tbq_10_100_100          },
+		{ "tbq-from_1_to_10",        m0_be_ut_tbq_from_1_to_10        },
 		{ "pool-usecase",            m0_be_ut_pool_usecase            },
 		{ "reg_d_tree",              m0_be_ut_reg_d_tree              },
 // XXX		{ "regmap-simple",           m0_be_ut_regmap_simple           },
