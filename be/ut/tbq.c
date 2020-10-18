@@ -72,6 +72,7 @@ struct be_ut_tbq_cfg {
 struct be_ut_tbq_result {
 	uint64_t butr_before;
 	uint64_t butr_data_index;
+	bool     butr_checked;
 };
 
 struct be_ut_tbq_ctx {
@@ -104,6 +105,7 @@ struct be_ut_tbq_thread_param {
 	uint64_t              butqp_index;
 	/* Number of items to put/get to/from the queue. */
 	uint64_t              butqp_items_nr;
+	/* just for debugging purposes */
 	uint64_t              butqp_peeks_successful;
 	uint64_t              butqp_peeks_unsuccessful;
 };
@@ -282,10 +284,22 @@ static void be_ut_tbq_with_cfg(struct be_ut_tbq_cfg *test_cfg)
 	for (i = 0; i < threads_nr; ++i)
 		m0_semaphore_fini(&params[i].butqp_sem_start);
 
+	/* at least one m0_be_tbq_peek() is supposed to fail in each case */
 	M0_UT_ASSERT(m0_exists(j,
 			       test_cfg->butc_producers +
 			       test_cfg->butc_consumers,
 			       params[j].butqp_peeks_unsuccessful > 0));
+	/* check happened-before relation for m0_be_tbq_get()s */
+	/* XXX */
+	/* check that each item is returned exactly once */
+	for (i = 0; i < items_nr; ++i) {
+		M0_UT_ASSERT(!ctx->butx_result[ctx->butx_result[i].
+					       butr_data_index].butr_checked);
+		ctx->butx_result[ctx->butx_result[i].
+			         butr_data_index].butr_checked = true;
+	}
+	M0_UT_ASSERT(m0_forall(j, items_nr, ctx->butx_result[j].butr_checked));
+
 	m0_free(params);
 	m0_free(ctx->butx_result);
 	m0_free(ctx->butx_data);
