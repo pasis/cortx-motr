@@ -287,8 +287,7 @@ static void be_tbq_op_get_done(struct m0_be_tbq      *bbq,
 	m0_be_op_done(bwo->bwo_op);
 	tbqop_tlist_move(&bbq->bbq_op_get_unused, bwo);
 	M0_LEAVE("bbq="BETBQ_F"bwo_data=%p bqd="BETBQD_F,
-		 BETBQ_P(bbq), bwo->bwo_data,
-		 BETBQD_P(&bwo->bwo_bqi->bbi_data));
+		 BETBQ_P(bbq), bwo->bwo_data, BETBQD_P(bqd));
 }
 
 static bool be_tbq_op_get_is_waiting(struct m0_be_tbq *bbq)

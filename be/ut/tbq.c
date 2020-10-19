@@ -117,16 +117,16 @@ struct be_ut_tbq_thread_param {
 
 static struct be_ut_tbq_cfg be_ut_tbq_tests_cfg[BE_UT_TBQ_NR] = {
 	[BE_UT_TBQ_1_1_1]      = BE_UT_TBQ_TEST(  1,   1,   1,     1),
-	[BE_UT_TBQ_2_1_1]      = BE_UT_TBQ_TEST(  2,   1,   1, 100),
-	[BE_UT_TBQ_100_1_1]    = BE_UT_TBQ_TEST(100,   1,   1, 100),
-	[BE_UT_TBQ_100_1_10]   = BE_UT_TBQ_TEST(100,   1,  10, 100),
-	[BE_UT_TBQ_100_10_1]   = BE_UT_TBQ_TEST(100,  10,   1, 100),
-	[BE_UT_TBQ_100_10_10]  = BE_UT_TBQ_TEST(100,  10,  10, 100),
-	[BE_UT_TBQ_10_100_1]   = BE_UT_TBQ_TEST( 10, 100,   1, 100),
-	[BE_UT_TBQ_10_100_5]   = BE_UT_TBQ_TEST( 10, 100,   5, 100),
-	[BE_UT_TBQ_10_1_100]   = BE_UT_TBQ_TEST( 10,   1, 100, 100),
-	[BE_UT_TBQ_10_5_100]   = BE_UT_TBQ_TEST( 10,   5, 100, 100),
-	[BE_UT_TBQ_10_100_100] = BE_UT_TBQ_TEST( 10, 100, 100, 100),
+	[BE_UT_TBQ_2_1_1]      = BE_UT_TBQ_TEST(  2,   1,   1, 10000),
+	[BE_UT_TBQ_100_1_1]    = BE_UT_TBQ_TEST(100,   1,   1, 10000),
+	[BE_UT_TBQ_100_1_10]   = BE_UT_TBQ_TEST(100,   1,  10, 10000),
+	[BE_UT_TBQ_100_10_1]   = BE_UT_TBQ_TEST(100,  10,   1, 10000),
+	[BE_UT_TBQ_100_10_10]  = BE_UT_TBQ_TEST(100,  10,  10, 10000),
+	[BE_UT_TBQ_10_100_1]   = BE_UT_TBQ_TEST( 10, 100,   1, 10000),
+	[BE_UT_TBQ_10_100_5]   = BE_UT_TBQ_TEST( 10, 100,   5, 10000),
+	[BE_UT_TBQ_10_1_100]   = BE_UT_TBQ_TEST( 10,   1, 100, 10000),
+	[BE_UT_TBQ_10_5_100]   = BE_UT_TBQ_TEST( 10,   5, 100, 10000),
+	[BE_UT_TBQ_10_100_100] = BE_UT_TBQ_TEST( 10, 100, 100, 10000),
 };
 
 #undef BE_UT_TBQ_TEST
@@ -164,7 +164,7 @@ static void be_ut_tbq_thread(void *_param)
 	struct m0_be_op               *op;
 	uint64_t                       i;
 	uint64_t                       index;
-	uint64_t                       get_before;
+	uint64_t                       before;
 
 	M0_ALLOC_PTR(op);
 	M0_UT_ASSERT(op != NULL);
@@ -172,19 +172,18 @@ static void be_ut_tbq_thread(void *_param)
 	m0_semaphore_down(&param->butqp_sem_start);
 	for (i = 0; i < param->butqp_items_nr; ++i) {
 		if (param->butqp_is_producer) {
-			index = m0_atomic64_add_return(&ctx->butx_pos, 1) - 1;
-			ctx->butx_result[index].butr_put_before =
-				m0_atomic64_add_return(&ctx->butx_clock, 1);
+			before = m0_atomic64_add_return(&ctx->butx_clock, 1);
 			m0_be_tbq_lock(bbq);
+			index = m0_atomic64_add_return(&ctx->butx_pos, 1) - 1;
 			be_ut_tbq_try_peek(param, ctx);
 			m0_be_tbq_put(bbq, op, &ctx->butx_data[index]);
 			m0_be_tbq_unlock(bbq);
 			m0_be_op_wait(op);
+			ctx->butx_result[index].butr_put_before = before;
 			ctx->butx_result[index].butr_put_after =
 				m0_atomic64_add_return(&ctx->butx_clock, 1);
 		} else {
-			get_before =
-				m0_atomic64_add_return(&ctx->butx_clock, 1);
+			before = m0_atomic64_add_return(&ctx->butx_clock, 1);
 			m0_be_tbq_lock(bbq);
 			m0_be_tbq_get(bbq, op, &data);
 			be_ut_tbq_try_peek(param, ctx);
@@ -193,7 +192,7 @@ static void be_ut_tbq_thread(void *_param)
 			index = be_ut_tbq_data_index(ctx, &data);
 			M0_UT_ASSERT(!ctx->butx_result[index].butr_checked);
 			ctx->butx_result[index].butr_checked = true;
-			ctx->butx_result[index].butr_get_before = get_before;
+			ctx->butx_result[index].butr_get_before = before;
 			ctx->butx_result[index].butr_get_after =
 				m0_atomic64_add_return(&ctx->butx_clock, 1);
 		}
@@ -292,13 +291,7 @@ static void be_ut_tbq_with_cfg(struct be_ut_tbq_cfg *test_cfg)
 			       test_cfg->butc_producers +
 			       test_cfg->butc_consumers,
 			       params[j].butqp_peeks_unsuccessful > 0));
-	/* happened-before relation for m0_be_tbq_put()s and m0_be_tbq_gets()s*/
-	for (i = 0; i < items_nr; ++i) {
-		M0_LOG(M0_ALWAYS, "put_before=%"PRIu64" put_after=%"PRIu64" "
-		       "get_before=%"PRIu64" get_after=%"PRIu64,
-		       r[i].butr_put_before, r[i].butr_put_after,
-		       r[i].butr_get_before, r[i].butr_get_after);
-	}
+	/* happened-before relation for m0_be_tbq_put() and m0_be_tbq_gets() */
 	M0_UT_ASSERT(m0_forall(j, items_nr,
 			       r[j].butr_put_before < r[j].butr_get_after));
 	M0_UT_ASSERT(m0_forall(j, items_nr - 1,
