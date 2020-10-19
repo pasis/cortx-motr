@@ -167,6 +167,18 @@ enum m0_magic_satchel {
 	/* m0_be_active_record_domain_subsystem::rds_list (be glad blood) */
 	M0_BE_ACT_REC_DOM_SUB_MAGIC = 0x33be91adb100d77,
 
+	/* be_tbq_item::bbi_magic (focoids based) */
+	M0_BE_TBQ_Q_MAGIC = 0x33f0c01d5ba5ed77,
+
+	/* m0_be_tbq::bbq_q, m0_be_tbq::bbq_q_unused (scaffle ecoid) */
+	M0_BE_TBQ_Q_HEAD_MAGIC = 0x335caff1eec01d77,
+
+	/* be_tbq_wait_op::bwo_magic (discoid faced) */
+	M0_BE_TBQ_OP_MAGIC = 0x33d15c01dfaced77,
+
+	/* m0_be_tbq::bbq_op_put*, m0_be_tbq::bbq_op_get* (coccoid slide) */
+	M0_BE_TBQ_OP_HEAD_MAGIC = 0x33c0cc01d511de77,
+
 /* m0t1fs */
 	/* m0t1fs_sb::s_magic (cozie filesis) */
 	M0_T1FS_SUPER_MAGIC = 0x33c021ef11e51577,

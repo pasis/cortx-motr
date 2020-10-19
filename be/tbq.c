@@ -55,12 +55,12 @@ struct be_tbq_wait_op {
 
 M0_TL_DESCR_DEFINE(tbq, "m0_be_tbq::bbq_q*[]", static,
 		   struct be_tbq_item, bbi_link, bbi_magic,
-		   /* XXX */ 1, /* XXX */ 2);
+		   M0_BE_TBQ_Q_MAGIC, M0_BE_TBQ_Q_HEAD_MAGIC);
 M0_TL_DEFINE(tbq, static, struct be_tbq_item);
 
 M0_TL_DESCR_DEFINE(tbqop, "m0_be_tbq::bbq_op_*[]", static,
 		   struct be_tbq_wait_op, bwo_link, bwo_magic,
-		   /* XXX */ 3, /* XXX */ 4);
+		   M0_BE_TBQ_OP_MAGIC, M0_BE_TBQ_OP_HEAD_MAGIC);
 M0_TL_DEFINE(tbqop, static, struct be_tbq_wait_op);
 
 
