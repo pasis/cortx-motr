@@ -187,7 +187,7 @@ static struct be_tbq_item *be_tbq_q_put(struct m0_be_tbq            *bbq,
 
 	bqi = tbq_tlist_head(&bbq->bbq_q_unused);
 	bqi->bbi_data = *bqd;
-	tbq_tlist_move(&bbq->bbq_q, bqi);
+	tbq_tlist_move_tail(&bbq->bbq_q, bqi);
 	++bbq->bbq_enqueued;
 	M0_LEAVE("bbq="BETBQ_F" bqd="BETBQD_F,
 		 BETBQ_P(bbq), BETBQD_P(&bqi->bbi_data));
@@ -267,10 +267,11 @@ static void be_tx_bulk_op_get(struct m0_be_tbq      *bbq,
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
 	M0_PRE(!tbqop_tlist_is_empty(&bbq->bbq_op_get_unused));
 
-	bwo = tbqop_tlist_pop(&bbq->bbq_op_get_unused);
+	bwo = tbqop_tlist_head(&bbq->bbq_op_get_unused);
 	bwo->bwo_data = bqd;
 	bwo->bwo_op   = op;
 	tbqop_tlist_move_tail(&bbq->bbq_op_get, bwo);
+	M0_LEAVE("bbq=%p bwo_data=%p", bbq, bwo->bwo_data);
 }
 
 static void be_tx_bulk_op_get_done(struct m0_be_tbq      *bbq,
@@ -281,10 +282,13 @@ static void be_tx_bulk_op_get_done(struct m0_be_tbq      *bbq,
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
 	M0_PRE(!tbqop_tlist_is_empty(&bbq->bbq_op_get));
 
-	bwo = tbqop_tlist_pop(&bbq->bbq_op_get);
+	bwo = tbqop_tlist_head(&bbq->bbq_op_get);
 	*bwo->bwo_data = *bqd;
 	m0_be_op_done(bwo->bwo_op);
-	tbqop_tlist_move_tail(&bbq->bbq_op_get_unused, bwo);
+	tbqop_tlist_move(&bbq->bbq_op_get_unused, bwo);
+	M0_LEAVE("bbq="BETBQ_F"bwo_data=%p bqd="BETBQD_F,
+		 BETBQ_P(bbq), bwo->bwo_data,
+		 BETBQD_P(&bwo->bwo_bqi->bbi_data));
 }
 
 static bool be_tx_bulk_op_get_is_waiting(struct m0_be_tbq *bbq)
