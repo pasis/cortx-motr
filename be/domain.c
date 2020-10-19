@@ -371,9 +371,7 @@ be_domain_log_cleanup(const char *stob_domain_location,
 	size  = strlen(stob_domain_location);
 	size += strlen(location_add) + 1;
 	location = m0_alloc(size);
-	strncpy(location, stob_domain_location, size);
-	strncat(location, location_add, size);
-	M0_ASSERT(location[size - 1] == '\0');
+	snprintf(location, size, "%s%s", stob_domain_location, location_add);
 	if (create) {
 		m0_stob_domain__dom_id_make(
 			&log_cfg->lc_store_cfg.lsc_stob_id.si_domain_fid,

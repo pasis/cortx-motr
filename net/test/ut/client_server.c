@@ -78,7 +78,7 @@ static char *addr_get(const char *nid, int tmid)
 
 	result = m0_alloc(rc + 1);
 	M0_UT_ASSERT(result != NULL);
-	return strncpy(result, addr, rc + 1);
+	return strcpy(result, addr);
 }
 
 static void addr_free(char *addr)
@@ -122,9 +122,9 @@ static void node_cfg_fill(struct m0_net_test_node_cfg *ncfg,
 	};
 
 	strncat(addr_cmd_list, ncfg->ntnc_addr, NTCS_NODE_ADDR_MAX - 1);
-	strncat(addr_cmd_list, last_node ? "" : ",", 1);
+	strcat(addr_cmd_list, last_node ? "" : ",");
 	strncat(addr_data_list, addr_data, NTCS_NODE_ADDR_MAX - 1);
-	strncat(addr_data_list, last_node ? "" : ",", 1);
+	strcat(addr_data_list, last_node ? "" : ",");
 
 	addr_free(addr_data);
 }

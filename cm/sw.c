@@ -91,6 +91,7 @@ M0_INTERNAL int m0_cm_sw_onwire_init(struct m0_cm *cm, struct m0_cm_sw_onwire *s
 	if (sw_onwire->swo_cm_ep.ep == NULL )
 		return M0_ERR(-ENOMEM);
 	strncpy(sw_onwire->swo_cm_ep.ep, ep, CS_MAX_EP_ADDR_LEN);
+	M0_ASSERT(sw_onwire->swo_cm_ep.ep[CS_MAX_EP_ADDR_LEN - 1] == '\0');
 	if (m0_cm_state_get(cm) == M0_CMS_FAIL)
 		sw_onwire->swo_cm_status = M0_PX_FAILED;
 	else if (m0_cm_state_get(cm) == M0_CMS_READY)

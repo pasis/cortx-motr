@@ -320,16 +320,21 @@ static void test_fail_abort(void)
 
 static char *suffix_subst(const char *src, char delim, const char *suffix)
 {
-	const size_t len = strlen(src) + 1 + strlen(suffix) + 1;
-	char        *s;
-	char        *p;
+	size_t  len;
+	size_t  len_prefix;
+	char   *s;
+	char   *p;
 
+	p = strrchr(src, delim);
+	M0_ASSERT(p != NULL);
+	len_prefix = p - src;
+	len = len_prefix + strlen(suffix) + 1;
 	s = m0_alloc(len);
 	M0_ASSERT(s != NULL);
-	strncpy(s, src, len);
-	p = strrchr(s, delim);
-	M0_ASSERT(p != NULL);
-	strncpy(p, suffix, strlen(suffix) + 1);
+	strncpy(s, src, len_prefix);
+	strncpy(&s[len_prefix], suffix, len - len_prefix);
+	M0_ASSERT(s[len - 1] == '\0');
+
 	return s;
 }
 

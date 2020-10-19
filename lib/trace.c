@@ -940,12 +940,12 @@ M0_INTERNAL void m0_trace_buf_header_init(struct m0_trace_buf_header *tbh, size_
 	m0_atomic64_set(&tbh->tbh_cur_pos, 0);
 	m0_atomic64_set(&tbh->tbh_rec_cnt, 0);
 
-	strncpy(tbh->tbh_motr_version, bi->bi_version_string,
-		sizeof tbh->tbh_motr_version);
-	strncpy(tbh->tbh_motr_git_describe, bi->bi_git_describe,
-		sizeof tbh->tbh_motr_git_describe);
-	strncpy(tbh->tbh_motr_kernel_ver, bi->bi_kernel,
-		sizeof tbh->tbh_motr_kernel_ver);
+	snprintf(tbh->tbh_motr_version, sizeof tbh->tbh_motr_version, "%s",
+		 bi->bi_version_string);
+	snprintf(tbh->tbh_motr_git_describe, sizeof tbh->tbh_motr_git_describe,
+		 "%s", bi->bi_git_describe);
+	snprintf(tbh->tbh_motr_kernel_ver, sizeof tbh->tbh_motr_kernel_ver,
+		 "%s", bi->bi_kernel);
 
 	m0_arch_trace_buf_header_init(tbh);
 }
