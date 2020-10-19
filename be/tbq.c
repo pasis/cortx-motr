@@ -168,12 +168,12 @@ static uint32_t be_tbq_q_size(struct m0_be_tbq *bbq)
 	return bbq->bbq_enqueued - bbq->bbq_dequeued;
 }
 
-static bool be_tx_bulk_is_empty(struct m0_be_tbq *bbq)
+static bool be_tbq_is_empty(struct m0_be_tbq *bbq)
 {
 	return be_tbq_q_size(bbq) == 0;
 }
 
-static bool be_tx_bulk_is_full(struct m0_be_tbq *bbq)
+static bool be_tbq_is_full(struct m0_be_tbq *bbq)
 {
 	return be_tbq_q_size(bbq) >= bbq->bbq_cfg.bqc_q_size_max;
 }
@@ -200,7 +200,7 @@ static void be_tbq_q_peek(struct m0_be_tbq      *bbq,
 	struct be_tbq_item *bqi;
 
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
-	M0_PRE(!be_tx_bulk_is_empty(bbq));
+	M0_PRE(!be_tbq_is_empty(bbq));
 
 	bqi = tbq_tlist_head(&bbq->bbq_q);
 	*bqd = bqi->bbi_data;
@@ -213,7 +213,7 @@ static void be_tbq_q_get(struct m0_be_tbq      *bbq,
 	struct be_tbq_item *bqi;
 
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
-	M0_PRE(!be_tx_bulk_is_empty(bbq));
+	M0_PRE(!be_tbq_is_empty(bbq));
 
 	bqi = tbq_tlist_head(&bbq->bbq_q);
 	*bqd = bqi->bbi_data;
@@ -222,7 +222,7 @@ static void be_tbq_q_get(struct m0_be_tbq      *bbq,
 	M0_LEAVE("bbq="BETBQ_F" bqd="BETBQD_F, BETBQ_P(bbq), BETBQD_P(bqd));
 }
 
-static void be_tx_bulk_op_put(struct m0_be_tbq   *bbq,
+static void be_tbq_op_put(struct m0_be_tbq   *bbq,
                               struct m0_be_op    *op,
                               struct be_tbq_item *bqi)
 {
@@ -239,7 +239,7 @@ static void be_tx_bulk_op_put(struct m0_be_tbq   *bbq,
 		 BETBQ_P(bbq), BETBQD_P(&bqi->bbi_data));
 }
 
-static void be_tx_bulk_op_put_done(struct m0_be_tbq *bbq)
+static void be_tbq_op_put_done(struct m0_be_tbq *bbq)
 {
 	struct be_tbq_wait_op *bwo;
 
@@ -253,12 +253,12 @@ static void be_tx_bulk_op_put_done(struct m0_be_tbq *bbq)
 		 BETBQ_P(bbq), BETBQD_P(&bwo->bwo_bqi->bbi_data));
 }
 
-static bool be_tx_bulk_op_put_is_waiting(struct m0_be_tbq *bbq)
+static bool be_tbq_op_put_is_waiting(struct m0_be_tbq *bbq)
 {
 	return !tbqop_tlist_is_empty(&bbq->bbq_op_put);
 }
 
-static void be_tx_bulk_op_get(struct m0_be_tbq      *bbq,
+static void be_tbq_op_get(struct m0_be_tbq      *bbq,
                               struct m0_be_op       *op,
                               struct m0_be_tbq_data *bqd)
 {
@@ -274,7 +274,7 @@ static void be_tx_bulk_op_get(struct m0_be_tbq      *bbq,
 	M0_LEAVE("bbq=%p bwo_data=%p", bbq, bwo->bwo_data);
 }
 
-static void be_tx_bulk_op_get_done(struct m0_be_tbq      *bbq,
+static void be_tbq_op_get_done(struct m0_be_tbq      *bbq,
                                    struct m0_be_tbq_data *bqd)
 {
 	struct be_tbq_wait_op *bwo;
@@ -291,7 +291,7 @@ static void be_tx_bulk_op_get_done(struct m0_be_tbq      *bbq,
 		 BETBQD_P(&bwo->bwo_bqi->bbi_data));
 }
 
-static bool be_tx_bulk_op_get_is_waiting(struct m0_be_tbq *bbq)
+static bool be_tbq_op_get_is_waiting(struct m0_be_tbq *bbq)
 {
 	return !tbqop_tlist_is_empty(&bbq->bbq_op_get);
 }
@@ -308,21 +308,21 @@ M0_INTERNAL void m0_be_tbq_put(struct m0_be_tbq      *bbq,
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
 
 	m0_be_op_active(op);
-	was_full = be_tx_bulk_is_full(bbq);
+	was_full = be_tbq_is_full(bbq);
 	bqi = be_tbq_q_put(bbq, bqd);
 	if (was_full) {
-		be_tx_bulk_op_put(bbq, op, bqi);
+		be_tbq_op_put(bbq, op, bqi);
 	} else {
 		m0_be_op_done(op);
 	}
-	if (be_tx_bulk_op_get_is_waiting(bbq)) {
+	if (be_tbq_op_get_is_waiting(bbq)) {
 		/*
 		 * Shortcut for this case hasn't been not done intentionally.
 		 * It's much easier to look at the logs when all items are
 		 * always added to the queue.
 		 */
 		be_tbq_q_get(bbq, &bqd_on_stack);
-		be_tx_bulk_op_get_done(bbq, &bqd_on_stack);
+		be_tbq_op_get_done(bbq, &bqd_on_stack);
 	}
 }
 
@@ -333,14 +333,14 @@ M0_INTERNAL void m0_be_tbq_get(struct m0_be_tbq      *bbq,
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
 
 	m0_be_op_active(op);
-	if (be_tx_bulk_is_empty(bbq) || be_tx_bulk_op_get_is_waiting(bbq)) {
-		be_tx_bulk_op_get(bbq, op, bqd);
+	if (be_tbq_is_empty(bbq) || be_tbq_op_get_is_waiting(bbq)) {
+		be_tbq_op_get(bbq, op, bqd);
 		return;
 	}
 	be_tbq_q_get(bbq, bqd);
 	m0_be_op_done(op);
-	if (be_tx_bulk_op_put_is_waiting(bbq))
-		be_tx_bulk_op_put_done(bbq);
+	if (be_tbq_op_put_is_waiting(bbq))
+		be_tbq_op_put_done(bbq);
 	M0_LEAVE("bbq="BETBQ_F" bqd="BETBQD_F, BETBQ_P(bbq), BETBQD_P(bqd));
 }
 
@@ -349,8 +349,8 @@ M0_INTERNAL bool m0_be_tbq_peek(struct m0_be_tbq      *bbq,
 {
 	M0_PRE(m0_mutex_is_locked(&bbq->bbq_lock));
 
-	if (be_tx_bulk_is_empty(bbq) ||
-	    be_tx_bulk_op_get_is_waiting(bbq)) {
+	if (be_tbq_is_empty(bbq) ||
+	    be_tbq_op_get_is_waiting(bbq)) {
 		M0_LOG(M0_DEBUG, "bbq=%p the queue is empty", bbq);
 		return false;
 	}
